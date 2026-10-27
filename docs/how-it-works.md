@@ -61,7 +61,9 @@ Both projects deploy to namespace `colour-<strategy>-<environment>` on target ta
    retries it.
 
 Prompted variables: **Start colour** (`random-without-red` by default; `random-with-red`
-makes roughly 1 in 8 pods start red; `red` guarantees a rollback; or a specific colour),
+makes roughly 1 in 8 pods start red; `uniform-without-red` and `uniform-with-red` do the same
+but give every non-red pod of a release one colour, the release number's SHA-256 modulo the 7
+non-red colours; `red` guarantees a rollback; or a specific colour),
 **Pause between canary steps** (canary) and **Analysis checks** (blue-green). Releases snapshot
 the project's values when they're created.
 

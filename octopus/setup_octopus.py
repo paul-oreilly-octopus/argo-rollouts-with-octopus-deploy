@@ -27,11 +27,13 @@ RUNBOOKS = {
                      "rolled back to as a record-only deployment, unless a newer deployment is already "
                      "queued or running."),
 }
-IMAGE = "colour-demo:1.2.0"
+IMAGE = "colour-demo:1.3.0"
 FAIL_COLOUR = "red"
 START_COLOURS = [
     ("random-without-red", "Random, never red"),
     ("random-with-red", "Random, sometimes red (some releases get rolled back)"),
+    ("uniform-without-red", "Uniform, never red (one colour per release)"),
+    ("uniform-with-red", "Uniform, sometimes red (one colour per release; some releases get rolled back)"),
     ("red", "Red (fails analysis: automatic rollback)"),
     ("blue", "Blue"), ("green", "Green"), ("teal", "Teal"), ("yellow", "Yellow"),
     ("orange", "Orange"), ("pink", "Pink"), ("purple", "Purple"),

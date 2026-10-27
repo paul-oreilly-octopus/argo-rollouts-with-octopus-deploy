@@ -4,7 +4,7 @@
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 
-IMAGE="${IMAGE:-colour-demo:1.2.0}"
+IMAGE="${IMAGE:-colour-demo:1.3.0}"
 
 step "Building $IMAGE"
 docker build -t "$IMAGE" "$ROOT/app"

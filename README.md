@@ -375,8 +375,10 @@ deleting anything.
    or `python3 octopus/simulate_builds.py canary --interval 10 --minutes 5`.
 
 Releases use the project's **Start colour** setting: `random-without-red`,
-`random-with-red` (roughly 1 in 8 pods start red, so some releases get rolled back), `red`,
-or a specific colour. Change it on the project's variables to control the releases created
+`random-with-red` (roughly 1 in 8 pods start red, so some releases get rolled back),
+`uniform-without-red` and `uniform-with-red` (the same, but every pod of a release that isn't
+red has one colour, picked from the release number), `red`, or a
+specific colour. Change it on the project's variables to control the releases created
 from then on.
 
 ## Stress tests

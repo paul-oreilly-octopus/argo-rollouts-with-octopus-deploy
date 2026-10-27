@@ -16,6 +16,12 @@ they were created with.
   repo root there, and `k` then ran against your current kubectl context; `k` now refuses to
   run if the settings aren't loaded.
 - `.gitignore` covers vim undo files (`*.un~`).
+- **Uniform start colours.** New **Start colour** options "Uniform, never red"
+  (`uniform-without-red`) and "Uniform, sometimes red" (`uniform-with-red`): every pod of a
+  release that isn't red gets the same colour, from the release number's SHA-256 modulo the
+  non-red colours, so a release's pods match. The Simulate builds runbook
+  uses them through the project's setting. The image is now `colour-demo:1.3.0`: run
+  `./install.sh dashboard octopus` and create a new release.
 - README: "Why a runbook records the rollback": Octopus runs one deployment at a time per
   project and environment, the demo needs "cancel superseded deployments", and that's why
   Argo's webhook starts a runbook instead of queuing a deployment.

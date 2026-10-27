@@ -54,7 +54,7 @@ spec:
       serviceAccountName: colour-demo-dashboard
       containers:
         - name: dashboard
-          image: colour-demo:1.2.0
+          image: colour-demo:1.3.0
           imagePullPolicy: IfNotPresent
           env:
             - name: MODE

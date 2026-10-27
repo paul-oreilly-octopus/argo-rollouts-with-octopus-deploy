@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Colour demo for Argo Rollouts (stdlib only).
 
-MODE=app        Runs in each Rollout pod. Starts with a random colour (or START_COLOUR),
+MODE=app        Runs in each Rollout pod. Starts with a colour chosen by START_COLOUR,
                 serves a page in that colour, and reports unhealthy on /api/health while
                 its colour is FAIL_COLOUR, which makes the Argo Rollouts analysis fail.
 MODE=dashboard  Lists colour-demo Rollouts and pods via the Kubernetes API, renders a
                 square per pod, and proxies colour changes through to the pods.
 """
+import hashlib
 import html
 import json
 import os
@@ -50,6 +51,12 @@ def random_colour(exclude=None):
     return random.choice([c for c in PALETTE if c not in (FAIL_COLOUR, exclude)])
 
 
+def release_colour(release):
+    """The same non-fail colour for every pod of a release: its SHA-256 modulo the colours."""
+    colours = [c for c in PALETTE if c != FAIL_COLOUR]
+    return colours[int(hashlib.sha256(release.encode()).hexdigest(), 16) % len(colours)]
+
+
 def format_age(seconds):
     seconds = max(0, int(seconds))
     if seconds < 60:
@@ -84,13 +91,21 @@ class Handler(BaseHTTPRequestHandler):
 
 class AppState:
     def __init__(self):
-        # START_COLOUR: a palette colour, "random-with-red" (may pick FAIL_COLOUR), or
-        # "random-without-red" / "random" (never picks FAIL_COLOUR).
+        # START_COLOUR: a palette colour, "random-with-red" (may pick FAIL_COLOUR),
+        # "random-without-red" / "random" (never picks FAIL_COLOUR), or "uniform-without-red" /
+        # "uniform-with-red": like the random ones, but every pod of a release that isn't
+        # FAIL_COLOUR gets the release's colour (release_colour of APP_VERSION).
         start = os.environ.get("START_COLOUR", "random-without-red").strip().lower()
+        release = os.environ.get("APP_VERSION", "")
         if start in PALETTE:
             self.colour = start
         elif start == "random-with-red":
             self.colour = random.choice(list(PALETTE))
+        elif start == "uniform-with-red":
+            # The same chance of FAIL_COLOUR per pod as random-with-red.
+            self.colour = FAIL_COLOUR if random.randrange(len(PALETTE)) == 0 else release_colour(release)
+        elif start == "uniform-without-red":
+            self.colour = release_colour(release)
         else:
             self.colour = random_colour()
         self.started = time.time()
