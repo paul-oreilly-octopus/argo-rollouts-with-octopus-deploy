@@ -68,8 +68,11 @@ non-red colours; `red` guarantees a rollback; or a specific colour),
 the project's values when they're created.
 
 The **Simulate builds** runbook creates a release every `BuildIntervalSeconds` for
-`BuildDurationMinutes`, versioned `MAJOR.MINOR.BUGFIX-BUILD`, to simulate a CI pipeline. It
-only creates releases; deploying them is separate. Releases snapshot the project's Start colour
+`BuildDurationMinutes`, versioned `MAJOR.MINOR.BUGFIX-BUILD`, to simulate a CI pipeline. With
+**Deploy each release** (`DeployReleases`, on by default) it also deploys each release to the
+environment it runs in, as soon as it's created, like continuous deployment: cancel superseded
+deployments means only the newest waiting deployment runs, so the cluster keeps up with the
+newest release. Releases snapshot the project's Start colour
 when they're created, so if the run's **Start colour** prompt differs from the project's
 setting, the runbook sets the project's value for the run, then restores it (unless it was
 changed meanwhile). Releases anyone else creates during the run get that colour too. This

@@ -21,7 +21,8 @@ RECORD_RUNBOOK = "Record Argo rollback"
 RUNBOOKS = {
     RUNBOOK: ("simulate-builds.ps1", "Create releases",
               "Creates a new release every N seconds for M minutes, versioned "
-              "MAJOR.MINOR.BUGFIX-BUILD, to simulate a CI pipeline producing builds."),
+              "MAJOR.MINOR.BUGFIX-BUILD, to simulate a CI pipeline producing builds, and optionally "
+              "deploys each one to the run's environment."),
     RECORD_RUNBOOK: ("record-argo-rollback.ps1", "Record or skip",
                      "Run by the Argo Rollouts webhook when Argo aborts a release. Records the release Argo "
                      "rolled back to as a record-only deployment, unless a newer deployment is already "
@@ -177,6 +178,11 @@ def variables(settings, runbooks, api_key_var):
             "Build interval (seconds)", "How often to create a new release.", required=True), runbook_scope),
         var("BuildDurationMinutes", "30", prompt(
             "Run for (minutes)", "How long to keep creating releases.", required=True), runbook_scope),
+        var("DeployReleases", "True", prompt(
+            "Deploy each release", "Deploy each release to the environment this runbook runs in, as soon as "
+            "it's created. Cancel superseded deployments means only the newest waiting deployment runs.",
+            [("True", "Yes: deploy each release"), ("False", "No: only create releases")], required=True),
+            runbook_scope),
         api_key_var,
     ]
 

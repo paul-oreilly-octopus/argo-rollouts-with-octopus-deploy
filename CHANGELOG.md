@@ -26,6 +26,10 @@ they were created with.
   but ignored it: releases always took the project's setting. Now the run's choice applies to
   the releases it creates (the runbook sets the project's value for the run, then restores
   it), and `simulate_builds.py` has `--colour`. Run `./install.sh octopus`.
+- **Simulate builds deploys its releases.** New runbook prompt **Deploy each release** (on by
+  default): each release is deployed to the runbook's environment as soon as it's created, so
+  the dashboard follows the newest release. `simulate_builds.py --no-deploy` only creates
+  releases, as before. Run `./install.sh octopus`.
 - README: "Why a runbook records the rollback": Octopus runs one deployment at a time per
   project and environment, the demo needs "cancel superseded deployments", and that's why
   Argo's webhook starts a runbook instead of queuing a deployment.

@@ -1,5 +1,7 @@
 # Runbook "Simulate builds": creates a release of this project every BuildIntervalSeconds
-# for BuildDurationMinutes, like a CI pipeline producing builds of the same image.
+# for BuildDurationMinutes, like a CI pipeline producing builds of the same image. With
+# DeployReleases True, it also deploys each one to the run's environment, like continuous
+# deployment; cancel superseded deployments means only the newest queued one runs.
 # Versions are MAJOR.MINOR.BUGFIX-BUILDNUMBER. BUILDNUMBER always increments; then
 # 90%: BUGFIX+1, 9%: MINOR+1 and BUGFIX=0, 1%: MAJOR+1 and MINOR=BUGFIX=0.
 # Each release snapshots the project's StartColour setting at the time it's created, so when
@@ -13,6 +15,9 @@ $projectId = $OctopusParameters["Octopus.Project.Id"]
 $runId = $OctopusParameters["Octopus.RunbookRun.Id"]
 $interval = [double]$OctopusParameters["BuildIntervalSeconds"]
 $minutes = [double]$OctopusParameters["BuildDurationMinutes"]
+$deploy = $OctopusParameters["DeployReleases"] -eq "True"
+$environmentId = $OctopusParameters["Octopus.Environment.Id"]
+$environmentName = $OctopusParameters["Octopus.Environment.Name"]
 $headers = @{ "X-Octopus-ApiKey" = $OctopusParameters["ReleaseCreatorApiKey"] }
 $api = "$server/api/$space"
 
@@ -47,11 +52,13 @@ if ($startColour) {
     if ($null -ne $replaced) { Write-Host "Start colour for this run's releases: $startColour (the project's setting, $replaced, is restored at the end)." }
     else { Write-Host "Start colour for this run's releases: $startColour." }
 }
-Write-Host "Starting from $major.$minor.$bugfix-$build; one release every $interval s for $minutes min."
+$deploying = if ($deploy) { ", each deployed to $environmentName" } else { " (not deployed)" }
+Write-Host "Starting from $major.$minor.$bugfix-$build; one release every $interval s for $minutes min$deploying."
 
 try {
 $deadline = (Get-Date).AddMinutes($minutes)
 $created = 0
+$deployed = 0
 $version = $null
 while ((Get-Date) -lt $deadline) {
     $tick = Get-Date
@@ -69,12 +76,22 @@ while ((Get-Date) -lt $deadline) {
         ReleaseNotes = "Simulated $kind build $build, created by runbook run $runId."
     } | ConvertTo-Json
     try {
-        Invoke-RestMethod "$api/releases" -Method Post -Headers $headers -Body $body -ContentType "application/json" | Out-Null
+        $release = Invoke-RestMethod "$api/releases" -Method Post -Headers $headers -Body $body -ContentType "application/json"
         $created++
         $version = $candidate
         Write-Host "Created release $candidate ($kind)"
     } catch {
         Write-Warning "Failed to create release ${candidate}: $($_.Exception.Message)"
+        $release = $null
+    }
+    if ($deploy -and $release) {
+        try {
+            $deployment = @{ ReleaseId = $release.Id; EnvironmentId = $environmentId } | ConvertTo-Json
+            Invoke-RestMethod "$api/deployments" -Method Post -Headers $headers -Body $deployment -ContentType "application/json" | Out-Null
+            $deployed++
+        } catch {
+            Write-Warning "Failed to deploy release $candidate to ${environmentName}: $($_.Exception.Message)"
+        }
     }
 
     $remaining = $interval - ((Get-Date) - $tick).TotalSeconds
@@ -86,4 +103,5 @@ while ((Get-Date) -lt $deadline) {
         Write-Host "Restored the project's Start colour setting to $replaced."
     }
 }
-Write-Highlight "Created $created releases with start colour $startColour; latest is $version."
+$deployedText = if ($deploy) { " and queued $deployed deployments to $environmentName" } else { "" }
+Write-Highlight "Created $created releases with start colour $startColour$deployedText; latest is $version."
