@@ -12,6 +12,14 @@ they were created with.
   space) and what it needs.
 - `AGENT-INSTRUCTIONS.md`: a checklist for AI agents, from forking the repo to a tested demo.
 - `install.sh` works with macOS's bash 3.2.
+- `source scripts/config.sh` works from zsh (macOS's default shell). It used to find the wrong
+  repo root there, and `k` then ran against your current kubectl context; `k` now refuses to
+  run if the settings aren't loaded.
+- `.gitignore` covers vim undo files (`*.un~`).
+- The dashboard shows **Rollout complete (pods unmonitored)** once a rollout has finished:
+  Argo's analysis only runs during a rollout, so recolouring a stable pod does nothing. The
+  image is now `colour-demo:1.2.0`; run `./install.sh dashboard octopus` and create a new
+  release.
 - **One API key for everything.** The installer no longer creates extra API keys for Argo
   Rollouts' webhook and the runbooks: they use the key you provide, which can be an AI agent
   key (Octopus doesn't let agent keys create API keys). `ARGO_NOTIFICATIONS_API_KEY_FILE` is

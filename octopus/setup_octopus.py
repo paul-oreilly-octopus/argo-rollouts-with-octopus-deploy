@@ -27,7 +27,7 @@ RUNBOOKS = {
                      "rolled back to as a record-only deployment, unless a newer deployment is already "
                      "queued or running."),
 }
-IMAGE = "colour-demo:1.1.0"
+IMAGE = "colour-demo:1.2.0"
 FAIL_COLOUR = "red"
 START_COLOURS = [
     ("random-without-red", "Random, never red"),

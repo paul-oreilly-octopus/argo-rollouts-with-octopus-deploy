@@ -351,6 +351,10 @@ def rollout_view(rollout, analysis, pods, infos, now):
         "strategy": strategy,
         "phase": status.get("phase", "Unknown"),
         "aborted": bool(status.get("abort")),
+        # Finished: every pod runs the stable release, and Argo's analysis (the only thing that
+        # checks a pod's colour) has stopped, so recolouring a pod changes nothing.
+        "complete": (status.get("phase") == "Healthy" and not status.get("abort") and not analysis
+                     and status.get("stableRS") == status.get("currentPodHash")),
         "message": status.get("message", ""),
         "step": step,
         "analysis": analysis,
@@ -431,6 +435,7 @@ h1{font-size:22px;margin:0}
 .phase-Progressing{background:#1e3a8a;border-color:#60a5fa}
 .phase-Paused{background:#713f12;border-color:#facc15}
 .phase-Degraded{background:#7f1d1d;border-color:#f87171}
+.complete{border-color:#22c55e;color:#86efac}
 .analysis-Failed,.analysis-Error{background:#7f1d1d;border-color:#f87171}
 .analysis-Running{border-color:#60a5fa}
 .analysis-Successful{border-color:#22c55e}
@@ -493,6 +498,7 @@ function rolloutHtml(ro, state) {
       <span class="chip">${esc(ro.strategy)}</span>
       <span class="chip phase-${esc(ro.phase)}">${esc(ro.phase)}${ro.aborted ? ' · aborted' : ''}</span>
       ${ro.step ? `<span class="chip">step ${esc(ro.step)}</span>` : ''}
+      ${ro.complete ? '<span class="chip complete">Rollout complete (pods unmonitored)</span>' : ''}
       ${ro.analysis ? `<span class="chip analysis-${esc(ro.analysis.phase)}">analysis ${esc(ro.analysis.text)}</span>` : ''}
       ${ro.release ? `<span class="muted">last applied by Octopus release ${esc(ro.release)}</span>` : ''}
     </div>

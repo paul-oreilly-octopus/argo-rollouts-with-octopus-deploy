@@ -23,6 +23,7 @@ venv/
 .idea/
 *.swp
 *~
+*.un~
 .DS_Store
 Thumbs.db
 desktop.ini
