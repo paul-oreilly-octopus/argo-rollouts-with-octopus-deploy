@@ -96,7 +96,7 @@ sequenceDiagram
   participant R as Record Argo rollback runbook
   O->>A: Deploy 1.0.5
   A->>A: A new pod turns red: analysis fails
-  A->>A: Abort; traffic back to 1.0.4's pods
+  A->>A: Abort, and send traffic back to 1.0.4's pods
   O-->>O: 1.0.5 deployment fails with Argo's reason
   A->>R: Webhook: rolled back from 1.0.5 to 1.0.4
   R->>R: Is a newer deployment on its way?
