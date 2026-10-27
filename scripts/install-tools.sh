@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Checks the prerequisites and installs any missing CLI tools into ~/.local/bin (no sudo):
-# kind, kubectl, helm and the kubectl-argo-rollouts plugin. Tools already on PATH are left
-# alone. Linux (including WSL 2) and macOS, amd64 or arm64.
+# Checks the prerequisites and installs any missing CLI tools into BIN_DIR (default
+# ~/.local/bin; no sudo): kind, kubectl, helm and the kubectl-argo-rollouts plugin. Tools
+# already on PATH are left alone. Linux (including WSL 2) and macOS, amd64 or arm64.
 set -euo pipefail
+user_path="$PATH"
+source "$(dirname "$0")/config.sh"  # settings, including BIN_DIR (also put first on PATH)
 
 KIND_VERSION="${KIND_VERSION:-v0.33.0}"
 KUBECTL_VERSION="${KUBECTL_VERSION:-v1.37.0}"
 HELM_VERSION="${HELM_VERSION:-v3.18.5}"
-ARGO_ROLLOUTS_VERSION="${ARGO_ROLLOUTS_VERSION:-v1.10.0}"
-BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
-export PATH="$BIN_DIR:$PATH"
 
 for cmd in docker python3 curl tar; do
   command -v "$cmd" >/dev/null || { echo "ERROR: $cmd is required but not installed." >&2; exit 1; }
@@ -47,7 +46,7 @@ if ! command -v helm >/dev/null; then
   install -m 0755 "$tmp/${os}-${arch}/helm" "$BIN_DIR/helm"
 fi
 
-case ":$PATH:" in *":$BIN_DIR:"*) ;; *) echo "NOTE: add $BIN_DIR to your PATH to use these tools directly." ;; esac
+case ":$user_path:" in *":$BIN_DIR:"*) ;; *) echo "NOTE: to use these tools yourself, add $BIN_DIR to your PATH (see README.md). The scripts don't need it." ;; esac
 echo "kind:    $(kind version)"
 echo "kubectl: $(kubectl version --client 2>/dev/null | head -1)"
 echo "helm:    $(helm version --short)"

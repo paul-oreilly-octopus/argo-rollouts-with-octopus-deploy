@@ -74,10 +74,15 @@ def _settings():
         "AGENT_CHART_VERSION": get("AGENT_CHART_VERSION", "3.15.3"),
         "ARGO_ROLLOUTS_VERSION": get("ARGO_ROLLOUTS_VERSION", "v1.10.0"),
         "INGRESS_NGINX_VERSION": get("INGRESS_NGINX_VERSION", "controller-v1.15.1"),
+        # Where install-tools.sh puts kind, kubectl, helm and kubectl-argo-rollouts
+        "BIN_DIR": str(_path(get("BIN_DIR", "~/.local/bin"))),
     }
 
 
 SETTINGS = _settings()
+# The scripts run the tools install-tools.sh installed, even when BIN_DIR isn't on the user's
+# PATH (on Linux, ~/.local/bin only joins PATH at the next login after it's created).
+os.environ["PATH"] = SETTINGS["BIN_DIR"] + os.pathsep + os.environ.get("PATH", "")
 
 
 def check():

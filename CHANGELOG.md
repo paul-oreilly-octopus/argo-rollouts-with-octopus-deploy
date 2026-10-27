@@ -18,6 +18,24 @@ they were created with.
   gone, and every `./install.sh` run updates the key in the cluster and the projects, so
   replacing it is just updating the file. Production setups should use separate, tightly
   scoped keys.
+- **Dashboard at http://localhost.** The dashboard's ingress answers for any host name, so
+  it's at `http://localhost` (or `http://localhost:<INGRESS_HTTP_PORT>`) instead of
+  `colour-demo.localtest.me`, which didn't resolve to the cluster on every machine (for
+  example, when the name resolved to IPv6 `::1` first). The installer checks the dashboard
+  responds and prints its link. Run `./install.sh dashboard` to update an existing cluster.
+- **Port checks.** Before creating the cluster, the installer checks `INGRESS_HTTP_PORT` and
+  `INGRESS_HTTPS_PORT` are free. When it reuses a cluster, it checks the cluster's port still
+  matches `INGRESS_HTTP_PORT`.
+- **Create the space first.** The README, `AGENTS.md` and `AGENT-INSTRUCTIONS.md` now have an
+  administrator create the demo's space first, with the key's account as a space manager. The
+  installer creates the space only if no space has that name and the key has `SpaceCreate`. If
+  the name doesn't match, it lists the spaces the key can see.
+- **Fixed: `FileNotFoundError: 'kubectl'` on a new Linux machine.** The Python scripts now find
+  the tools the installer added, even when `~/.local/bin` isn't on your `PATH` yet.
+- New setting `BIN_DIR` (default `~/.local/bin`): where the installer puts missing tools. Every
+  script uses it. The Linux setup now explains how to add it to your `PATH`.
+- First-deployment timings in `AGENTS.md` and `AGENT-INSTRUCTIONS.md`: about 30 seconds, since
+  there's no earlier release to roll out from.
 
 ## 0.1.0
 

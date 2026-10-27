@@ -58,7 +58,7 @@ flowchart LR
     agent["Octopus Kubernetes agent<br/>+ Kubernetes monitor"]
     argo["Argo Rollouts controller"]
     pods["Rollout pods<br/>(one colour each)"]
-    dash["Dashboard<br/>colour-demo.localtest.me"]
+    dash["Dashboard<br/>http://localhost"]
   end
   agent -- "polls for deployments (outbound HTTPS)" --> projects
   agent -- "applies the Rollout" --> argo
@@ -130,7 +130,7 @@ the webhook goes through a runbook, rapid deployments, and what was learned buil
 - About 4 GB of free memory for Docker, plus ports 80 and 443. You can choose other ports.
 
 The installer adds `kind`, `kubectl`, `helm` and the `kubectl-argo-rollouts` plugin to
-`~/.local/bin` if you don't have them.
+`~/.local/bin` (or `BIN_DIR`) if you don't have them.
 
 **Octopus**
 - An Octopus instance: Octopus Cloud, or a recent self-hosted Octopus Server that supports the
@@ -195,9 +195,10 @@ can't do that, so an administrator deletes the space instead.
 ## Preparing your machine
 
 The cluster runs on your machine in Docker: one control plane and two worker nodes, with
-ingress on ports 80 and 443 so the dashboard is at http://colour-demo.localtest.me
-(`localtest.me` always resolves to 127.0.0.1). The installer does the rest. It's the same on
-every OS. Only getting Docker ready differs.
+ingress on ports 80 and 443 so the dashboard is at http://localhost (or
+`http://localhost:<port>` if you choose another port). The installer checks the ports are free
+before it creates the cluster, and prints the dashboard's link when it's done. The installer
+does the rest. It's the same on every OS. Only getting Docker ready differs.
 
 ### Linux
 
@@ -223,7 +224,12 @@ Tested on Ubuntu 24.04; any recent amd64 or arm64 distribution with Docker shoul
    ```
 4. **Check ports 80 and 443** are free: `ss -ltn | grep -E ':(80|443)\s'`. If something is
    using them, or you run **rootless Docker** (which can't use ports below 1024), set
-   `INGRESS_HTTP_PORT=8080` and `INGRESS_HTTPS_PORT=8443` in `config.env`.
+   `INGRESS_HTTP_PORT=8080` and `INGRESS_HTTPS_PORT=8443` in `config.env`. The dashboard is
+   then at http://localhost:8080.
+5. **Optional: add the tools' folder to your `PATH`** so you can use `kubectl` and `kind`
+   yourself (the scripts don't need it):
+   `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`, then open a new terminal.
+   Ubuntu adds `~/.local/bin` by itself, but only at a login after the folder exists.
 
 ### macOS
 
@@ -253,16 +259,21 @@ demo hasn't been tested on them.
    break the scripts.
 4. Install the prerequisites in Ubuntu: `sudo apt-get install -y python3 curl tar git`.
 
-The dashboard at http://colour-demo.localtest.me opens in your Windows browser too.
+The dashboard at http://localhost opens in your Windows browser too.
 
 ## Quick start
+
+**Before you start, create the demo's space in Octopus**, with the account whose API key you'll
+use as a space manager. An administrator does this: see
+[The Octopus API key](#the-octopus-api-key). (If your own key can create spaces, you can skip
+this: the installer creates the space.)
 
 ```bash
 # 1. Get the code: fork this repo on GitHub, then clone your fork
 git clone https://github.com/<you>/argo-rollouts-with-octopus-deploy.git
 cd argo-rollouts-with-octopus-deploy
 
-# 2. Settings: only OCTOPUS_URL is required
+# 2. Settings: set OCTOPUS_URL, and OCTOPUS_SPACE_NAME to the space's exact name
 cp config.example.env config.env
 $EDITOR config.env
 
@@ -277,13 +288,13 @@ $EDITOR secrets/octopus-api-key.txt
 `./install.sh` checks your settings, then:
 1. installs missing tools;
 2. creates the kind cluster with ingress-nginx and Argo Rollouts;
-3. creates the Octopus space (if it doesn't exist) and environments;
+3. finds the Octopus space (or creates it, if your key can) and adds its environments;
 4. installs the Octopus Kubernetes agent;
 5. builds and deploys the dashboard;
 6. creates the Octopus projects and runbooks;
 7. connects Argo Rollouts' notifications to Octopus.
 
-You can run single steps, e.g. `./install.sh octopus argo`.
+It ends by printing the dashboard's link, e.g. http://localhost. You can run single steps, e.g. `./install.sh octopus argo`.
 
 Then do a first deployment of each project:
 
@@ -317,8 +328,8 @@ deleting anything.
 
 ## Running the demo
 
-1. Open the dashboard (the installer prints the URL, normally
-   http://colour-demo.localtest.me) next to the **Colour Demo - Canary** project in Octopus.
+1. Open the dashboard (the installer prints the link: http://localhost, or
+   `http://localhost:<INGRESS_HTTP_PORT>`; `scripts/dashboard-url.sh` prints it again) next to the **Colour Demo - Canary** project in Octopus.
 2. Deploy a release. Either click **Deploy** in Octopus, or run
    `python3 octopus/deploy.py canary`. Watch the canary pods appear on the dashboard and the
    traffic weight step up.
@@ -365,13 +376,14 @@ settings with `python3 octopus/config.py check`; it never prints the key.
 |---|---|---|
 | `OCTOPUS_URL` | (required) | e.g. `https://your-instance.octopus.app` |
 | `OCTOPUS_API_KEY_FILE` | `secrets/octopus-api-key.txt` | A file containing your API key |
-| `OCTOPUS_SPACE_NAME` | `Argo Rollouts Demo` | Created if it doesn't exist (needs `SpaceCreate`) |
+| `OCTOPUS_SPACE_NAME` | `Argo Rollouts Demo` | The demo's space. Must match exactly. Created only if no space has this name and your key has `SpaceCreate` |
 | `OCTOPUS_ENVIRONMENTS` | `Development,Staging,Production` | Created if missing |
 | `OCTOPUS_DEMO_ENVIRONMENT` | `Development` | Used by the scripts |
 | `OCTOPUS_WORKER_POOL` | Hosted Ubuntu, else the default pool | For the runbooks |
 | `OCTOPUS_POLLING_URL`, `OCTOPUS_GRPC_URL` | Derived from `OCTOPUS_URL` | Set these for self-hosted servers |
 | `CLUSTER_NAME` | `argo-rollouts-demo` | The kind cluster, and the agent's target name (`AGENT_NAME`) |
-| `INGRESS_HTTP_PORT`, `INGRESS_HTTPS_PORT` | `80`, `443` | Change them if those ports are in use |
+| `INGRESS_HTTP_PORT`, `INGRESS_HTTPS_PORT` | `80`, `443` | Change them if those ports are in use. The dashboard is at `http://localhost:<INGRESS_HTTP_PORT>`. Fixed when the cluster is created |
+| `BIN_DIR` | `~/.local/bin` | Where the installer puts missing tools. The scripts always use it |
 
 The scripts always use the demo cluster's kubectl context (`kind-<CLUSTER_NAME>`), never
 whatever your current context is.
@@ -425,9 +437,11 @@ administrator delete the space, the service account and its API key.
 | Symptom | Fix |
 |---|---|
 | `can't reach Docker` | Start Docker. On Linux, add your user to the `docker` group. On WSL, enable Docker Desktop's WSL integration for your distro |
-| Cluster creation fails with "port is already allocated" | Set `INGRESS_HTTP_PORT` / `INGRESS_HTTPS_PORT` to free ports, run `./uninstall.sh`, then `./install.sh` |
+| `port ... is already in use`, or "port is already allocated" | Set `INGRESS_HTTP_PORT` / `INGRESS_HTTPS_PORT` in `config.env` to free ports. If the cluster was already created, run `./uninstall.sh`, then `./install.sh` |
+| `the cluster's dashboard port is ..., but INGRESS_HTTP_PORT is ...` | You changed the port after creating the cluster. Set it back, or run `./uninstall.sh`, then `./install.sh` |
 | Pods fail with "too many open files" (Linux) | Raise the inotify limits: see [Linux](#linux) |
-| Creating the space fails with 401/403 | The key's account can't create spaces. Have an administrator create the space with that account as a space manager: see [The Octopus API key](#the-octopus-api-key) |
+| `No space named ... is visible to ...` | The message lists the spaces the key can see. If the demo's space is there under a slightly different name, set `OCTOPUS_SPACE_NAME` to its exact name. If not, have an administrator create the space with that account as a space manager: see [The Octopus API key](#the-octopus-api-key) |
+| The dashboard doesn't load | Use the link the installer printed (`scripts/dashboard-url.sh`). It's `http://localhost:<port>` if you changed `INGRESS_HTTP_PORT` |
 | `Worker pool ... not found` or runbooks never start | Set `OCTOPUS_WORKER_POOL` to a pool whose workers have PowerShell and can reach Octopus |
 | The agent never connects (self-hosted) | Set `OCTOPUS_POLLING_URL` (and `OCTOPUS_GRPC_URL`) to your server's polling and gRPC addresses |
 | `bad interpreter` or `$'\r'` errors | The scripts have Windows line endings. Clone inside WSL, or run `git add --renormalize .` |

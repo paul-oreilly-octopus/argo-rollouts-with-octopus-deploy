@@ -4,9 +4,26 @@
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }  # something accepts connections on it
+
 if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
   echo "Cluster '$CLUSTER_NAME' already exists; reusing it."
+  # Host ports are fixed when the cluster is created: changing them in config.env needs a new cluster.
+  mapped="$(docker port "$CLUSTER_NAME-control-plane" 80/tcp 2>/dev/null | head -1)"
+  if [[ -n "$mapped" && "${mapped##*:}" != "$INGRESS_HTTP_PORT" ]]; then
+    echo "ERROR: the cluster's dashboard port is ${mapped##*:}, but INGRESS_HTTP_PORT is $INGRESS_HTTP_PORT." >&2
+    echo "Set INGRESS_HTTP_PORT back to ${mapped##*:}, or run ./uninstall.sh and then ./install.sh to recreate the cluster." >&2
+    exit 1
+  fi
 else
+  for setting in INGRESS_HTTP_PORT INGRESS_HTTPS_PORT; do
+    port="${!setting}"
+    if port_in_use "$port"; then
+      echo "ERROR: port $port ($setting) is already in use on this machine." >&2
+      echo "Set $setting in config.env to a free port (e.g. 8080 for HTTP, 8443 for HTTPS), then run ./install.sh again." >&2
+      exit 1
+    fi
+  done
   step "Creating kind cluster '$CLUSTER_NAME' (ingress on ports $INGRESS_HTTP_PORT/$INGRESS_HTTPS_PORT)"
   # kind switches the current kubectl context to the new cluster; put the user's back afterwards
   # (these scripts always use --context $KUBE_CONTEXT).

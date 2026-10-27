@@ -1,4 +1,4 @@
-# Colour Rollouts dashboard: http://colour-demo.localtest.me
+# Colour Rollouts dashboard: http://localhost (or http://localhost:<INGRESS_HTTP_PORT>)
 # Reads Rollouts, AnalysisRuns and pods cluster-wide and proxies colour changes to pods.
 apiVersion: v1
 kind: Namespace
@@ -92,8 +92,8 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: colour-demo.localtest.me
-      http:
+    # No host: the ingress answers for any name, so http://localhost[:port] works.
+    - http:
         paths:
           - path: /
             pathType: Prefix
