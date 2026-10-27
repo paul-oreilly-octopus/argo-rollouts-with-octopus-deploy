@@ -69,7 +69,11 @@ the project's values when they're created.
 
 The **Simulate builds** runbook creates a release every `BuildIntervalSeconds` for
 `BuildDurationMinutes`, versioned `MAJOR.MINOR.BUGFIX-BUILD`, to simulate a CI pipeline. It
-only creates releases; deploying them is separate.
+only creates releases; deploying them is separate. Releases snapshot the project's Start colour
+when they're created, so if the run's **Start colour** prompt differs from the project's
+setting, the runbook sets the project's value for the run, then restores it (unless it was
+changed meanwhile). Releases anyone else creates during the run get that colour too. This
+means the runbook's key also needs permission to edit the project's variables.
 
 ## Keeping Octopus in sync with Argo rollbacks
 

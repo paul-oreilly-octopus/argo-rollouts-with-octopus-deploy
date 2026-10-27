@@ -149,7 +149,8 @@ def variables(settings, runbooks, api_key_var):
         var("StartColour", "random-without-red", prompt(
             "Start colour",
             "Colour new pods start with. Releases snapshot this value when they're created, so change it "
-            "here to control releases created from now on (including by the Simulate builds runbook). "
+            "here to control releases created from now on. The Simulate builds runbook uses the value chosen "
+            "for its run. "
             f"Any pod starting {FAIL_COLOUR} fails the Argo Rollouts analysis and triggers an automatic rollback.",
             START_COLOURS, required=False)),  # optional, so API deployments (the Argo webhook) use the release's value
         var("RolloutTimeoutSeconds", "900"),

@@ -20,8 +20,12 @@ they were created with.
   (`uniform-without-red`) and "Uniform, sometimes red" (`uniform-with-red`): every pod of a
   release that isn't red gets the same colour, from the release number's SHA-256 modulo the
   non-red colours, so a release's pods match. The Simulate builds runbook
-  uses them through the project's setting. The image is now `colour-demo:1.3.0`: run
+  uses them too. The image is now `colour-demo:1.3.0`: run
   `./install.sh dashboard octopus` and create a new release.
+- **Simulate builds uses its Start colour prompt.** The runbook showed a Start colour prompt
+  but ignored it: releases always took the project's setting. Now the run's choice applies to
+  the releases it creates (the runbook sets the project's value for the run, then restores
+  it), and `simulate_builds.py` has `--colour`. Run `./install.sh octopus`.
 - README: "Why a runbook records the rollback": Octopus runs one deployment at a time per
   project and environment, the demo needs "cancel superseded deployments", and that's why
   Argo's webhook starts a runbook instead of queuing a deployment.

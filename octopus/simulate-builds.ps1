@@ -2,7 +2,9 @@
 # for BuildDurationMinutes, like a CI pipeline producing builds of the same image.
 # Versions are MAJOR.MINOR.BUGFIX-BUILDNUMBER. BUILDNUMBER always increments; then
 # 90%: BUGFIX+1, 9%: MINOR+1 and BUGFIX=0, 1%: MAJOR+1 and MINOR=BUGFIX=0.
-# Each release snapshots the project's StartColour setting at the time it's created.
+# Each release snapshots the project's StartColour setting at the time it's created, so when
+# the run's "Start colour" prompt differs from the project's setting, the run sets the project's
+# value for its duration (releases created by anyone meanwhile get it too), then puts it back.
 $ErrorActionPreference = "Stop"
 
 $server = $OctopusParameters["Octopus.Web.ServerUri"].TrimEnd("/")
@@ -24,8 +26,30 @@ foreach ($release in (Invoke-RestMethod "$api/projects/$projectId/releases?take=
     }
 }
 $channelId = (Invoke-RestMethod "$api/projects/$projectId/channels" -Headers $headers).Items[0].Id
+
+# Sets the project's unscoped StartColour to $to, if it's currently $from (or $from is $null).
+# Returns the value it replaced, or $null if it changed nothing.
+$variablesUrl = "$api/variables/$((Invoke-RestMethod "$api/projects/$projectId" -Headers $headers).VariableSetId)"
+function Set-StartColour($to, $from) {
+    $set = Invoke-RestMethod $variablesUrl -Headers $headers
+    $variable = $set.Variables | Where-Object { $_.Name -eq "StartColour" -and -not ($_.Scope.PSObject.Properties | Select-Object -First 1) } | Select-Object -First 1
+    if (-not $variable -or $variable.Value -eq $to -or ($null -ne $from -and $variable.Value -ne $from)) { return $null }
+    $old = $variable.Value
+    $variable.Value = $to
+    # Sensitive values come back as null, and Octopus keeps a sensitive variable's value when it's sent as null.
+    Invoke-RestMethod $variablesUrl -Method Put -Headers $headers -Body ($set | ConvertTo-Json -Depth 20) -ContentType "application/json" | Out-Null
+    return $old
+}
+$startColour = $OctopusParameters["StartColour"]
+$replaced = $null
+if ($startColour) {
+    $replaced = Set-StartColour $startColour $null
+    if ($null -ne $replaced) { Write-Host "Start colour for this run's releases: $startColour (the project's setting, $replaced, is restored at the end)." }
+    else { Write-Host "Start colour for this run's releases: $startColour." }
+}
 Write-Host "Starting from $major.$minor.$bugfix-$build; one release every $interval s for $minutes min."
 
+try {
 $deadline = (Get-Date).AddMinutes($minutes)
 $created = 0
 $version = $null
@@ -56,4 +80,10 @@ while ((Get-Date) -lt $deadline) {
     $remaining = $interval - ((Get-Date) - $tick).TotalSeconds
     if ($remaining -gt 0) { Start-Sleep -Milliseconds ([int]($remaining * 1000)) }
 }
-Write-Highlight "Created $created releases; latest is $version."
+} finally {
+    # Put the project's setting back, unless someone changed it during the run.
+    if ($null -ne $replaced -and $null -ne (Set-StartColour $replaced $startColour)) {
+        Write-Host "Restored the project's Start colour setting to $replaced."
+    }
+}
+Write-Highlight "Created $created releases with start colour $startColour; latest is $version."

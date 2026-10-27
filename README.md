@@ -372,7 +372,9 @@ deleting anything.
 4. For a guaranteed rollback, deploy with a red start colour:
    `python3 octopus/deploy.py canary --colour red`.
 5. To simulate a CI pipeline producing builds, run the project's **Simulate builds** runbook,
-   or `python3 octopus/simulate_builds.py canary --interval 10 --minutes 5`.
+   or `python3 octopus/simulate_builds.py canary --interval 10 --minutes 5`. Its **Start
+   colour** prompt (`--colour` on the command line) sets the colour of the releases it creates,
+   e.g. "Uniform, sometimes red".
 
 Releases use the project's **Start colour** setting: `random-without-red`,
 `random-with-red` (roughly 1 in 8 pods start red, so some releases get rolled back),
