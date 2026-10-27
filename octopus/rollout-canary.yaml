@@ -1,0 +1,117 @@
+# Applied by Octopus project "Colour Demo - Canary". #{...} are Octopus variables.
+# Canary: 25% -> 50% -> 75% -> 100% of pods, with background analysis checking the
+# canary pods every 5s from step 2 onwards. One red canary pod aborts the rollout.
+# The stable/canary Services are created by the "Prepare namespace" step, not here.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: colour-health
+spec:
+  args:
+    - name: service
+  metrics:
+    - name: colour-health
+      # Pods report healthy=false while their colour is the fail colour.
+      interval: 5s
+      initialDelay: 10s
+      failureLimit: 0
+      successCondition: result.healthy == true
+      provider:
+        web:
+          url: "http://{{args.service}}/api/health"
+          jsonPath: "{$}"
+          timeoutSeconds: 3
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: "#{RolloutName}"
+  labels:
+    app.kubernetes.io/part-of: colour-demo
+  annotations:
+    # Where this Rollout lives in Octopus. On abort, the Argo Rollouts webhook
+    # (k8s/argo-notifications.yaml) runs this project's Record Argo rollback runbook, which
+    # records rollback-release (the release Argo falls back to) in this environment.
+    octopus.com/space-id: "#{Octopus.Space.Id}"
+    octopus.com/project: "#{Octopus.Project.Name}"
+    octopus.com/environment: "#{Octopus.Environment.Name}"
+    octopus.com/release: "#{Octopus.Release.Number}"
+    octopus.com/rollback-release: "#{Octopus.Action[Check deployed version].Output.StableRelease}"
+    octopus.com/deployment: "#{Octopus.Deployment.Id}"
+    octopus.com/deployed-at: "#{Octopus.Action[Check deployed version].Output.DeployedAt}"
+    notifications.argoproj.io/subscribe.on-aborted-sync-octopus.octopus: ""
+spec:
+  replicas: 4
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      colour-demo/rollout: "#{RolloutName}"
+  template:
+    metadata:
+      annotations:
+        # Each ReplicaSet records its Octopus release, so the cluster can say which
+        # release is actually running.
+        octopus.com/release: "#{Octopus.Release.Number}"
+      labels:
+        app.kubernetes.io/part-of: colour-demo
+        colour-demo/rollout: "#{RolloutName}"
+    spec:
+      containers:
+        - name: colour-app
+          image: "#{Image}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: MODE
+              value: app
+            - name: APP_VERSION
+              value: "#{Octopus.Release.Number}"
+            - name: START_COLOUR
+              value: "#{StartColour}"
+            - name: FAIL_COLOUR
+              value: "#{FailColour}"
+            - name: ROLLOUT_NAME
+              value: "#{RolloutName}"
+            - name: STRATEGY
+              value: canary
+            - name: CONTAINER_NAME
+              value: colour-app
+            - name: IMAGE
+              value: "#{Image}"
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+            - name: POD_IP
+              valueFrom: {fieldRef: {fieldPath: status.podIP}}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+  strategy:
+    canary:
+      stableService: "#{RolloutName}-stable"
+      canaryService: "#{RolloutName}-canary"
+      analysis:
+        templates:
+          - templateName: colour-health
+        startingStep: 1
+        args:
+          - name: service
+            value: "#{RolloutName}-canary.#{Namespace}.svc.cluster.local"
+      steps:
+        - setWeight: 25
+        - pause: {duration: "#{PauseDuration}"}
+        - setWeight: 50
+        - pause: {duration: "#{PauseDuration}"}
+        - setWeight: 75
+        - pause: {duration: "#{PauseDuration}"}

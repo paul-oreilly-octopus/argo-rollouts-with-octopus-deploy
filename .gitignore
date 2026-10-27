@@ -1,0 +1,32 @@
+# Your settings and secrets: never commit these (a fork of a public repo is public too).
+config.env
+secrets/*
+!secrets/README.md
+*.key
+*api-key*.txt
+.env
+.env.*
+kubeconfig
+*.kubeconfig
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local output
+*.log
+*.tmp

@@ -1,0 +1,104 @@
+# Colour Rollouts dashboard: http://colour-demo.localtest.me
+# Reads Rollouts, AnalysisRuns and pods cluster-wide and proxies colour changes to pods.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: colour-demo-dashboard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: colour-demo-dashboard
+  namespace: colour-demo-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: colour-demo-dashboard
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [argoproj.io]
+    resources: [rollouts, analysisruns]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: colour-demo-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: colour-demo-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: colour-demo-dashboard
+    namespace: colour-demo-dashboard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: colour-demo-dashboard
+  namespace: colour-demo-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: colour-demo-dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: colour-demo-dashboard
+    spec:
+      serviceAccountName: colour-demo-dashboard
+      containers:
+        - name: dashboard
+          image: colour-demo:1.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MODE
+              value: dashboard
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: colour-demo-dashboard
+  namespace: colour-demo-dashboard
+spec:
+  selector:
+    app.kubernetes.io/name: colour-demo-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: colour-demo-dashboard
+  namespace: colour-demo-dashboard
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: colour-demo.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: colour-demo-dashboard
+                port:
+                  number: 80

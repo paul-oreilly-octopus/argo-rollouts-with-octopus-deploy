@@ -1,0 +1,66 @@
+# Argo Rollouts notifications: when Argo aborts a Rollout (and so rolls back to the stable
+# ReplicaSet), run the project's "Record Argo rollback" runbook in Octopus. Unless a newer
+# deployment is already queued or running, it records the release that's now running as a
+# record-only deployment (ArgoRollback.Triggered=True), so Octopus shows what's actually in
+# the cluster. Runbook runs aren't queued behind deployments, so it decides straight away.
+#
+# Rollouts opt in with the annotation
+#   notifications.argoproj.io/subscribe.on-aborted-sync-octopus.octopus: ""
+# and say where they live in Octopus with octopus.com/* annotations (see
+# octopus/rollout-*.yaml). octopus.com/rollback-release is the release of the stable
+# ReplicaSet when the deployment started, i.e. the release Argo falls back to.
+#
+# The API key comes from Secret argo-rollouts-notification-secret, key octopus-api-key.
+# Apply this with octopus/setup_argo_notifications.py, which creates that Secret and replaces
+# __OCTOPUS_URL__ with your OCTOPUS_URL.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-rollouts-notification-configmap
+  namespace: argo-rollouts
+data:
+  service.webhook.octopus: |
+    url: __OCTOPUS_URL__/api
+    headers:
+      - name: X-Octopus-ApiKey
+        value: $octopus-api-key
+      - name: Content-Type
+        value: application/json
+
+  # Argo Rollouts evaluates triggers two ways: per event (a trigger named after an event
+  # reason, e.g. on-rollout-aborted, fires each time that event is recorded) and continuously
+  # (every trigger's `when` is checked on each Rollout update; it sends once when the condition
+  # becomes true, records that in the notified.notifications.argoproj.io annotation, and re-arms
+  # once the condition is false again). This name matches no event, so only the continuous,
+  # once-per-abort path applies. Failed sends aren't recorded, so they're retried on later updates.
+  # Rollouts without a release to fall back to (a first deployment) are ignored. The abort must
+  # be newer than the Octopus deployment that applied the spec (both RFC 3339 UTC, so they
+  # compare as strings): when a new release is applied to an already-aborted Rollout, Argo
+  # clears status.abort a moment after it observes the new spec, and without this check that
+  # stale abort would send the previous rollback again.
+  trigger.on-aborted-sync-octopus: |
+    - send: [octopus-record-rollback]
+      when: >-
+        rollout.status.abort == true &&
+        (rollout.status.abortedAt ?? "") > (rollout.metadata.annotations?.["octopus.com/deployed-at"] ?? "") &&
+        (rollout.metadata.annotations?.["octopus.com/rollback-release"] ?? "") != ""
+
+  template.octopus-record-rollback: |
+    webhook:
+      octopus:
+        method: POST
+        path: /{{ index .rollout.metadata.annotations "octopus.com/space-id" }}/runbook-runs/create/v1
+        body: |
+          {
+            "SpaceId": {{ index .rollout.metadata.annotations "octopus.com/space-id" | toJson }},
+            "SpaceIdOrName": {{ index .rollout.metadata.annotations "octopus.com/space-id" | toJson }},
+            "ProjectName": {{ index .rollout.metadata.annotations "octopus.com/project" | toJson }},
+            "RunbookName": "Record Argo rollback",
+            "EnvironmentNames": [{{ index .rollout.metadata.annotations "octopus.com/environment" | toJson }}],
+            "Variables": {
+              "ArgoRollback.Release": {{ index .rollout.metadata.annotations "octopus.com/rollback-release" | toJson }},
+              "ArgoRollback.AbortedRelease": {{ index .rollout.metadata.annotations "octopus.com/release" | toJson }},
+              "ArgoRollback.AbortedDeployment": {{ index .rollout.metadata.annotations "octopus.com/deployment" | toJson }},
+              "ArgoRollback.Reason": {{ .rollout.status.message | default "" | toJson }}
+            }
+          }

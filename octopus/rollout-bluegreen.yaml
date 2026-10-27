@@ -1,0 +1,119 @@
+# Applied by Octopus project "Colour Demo - Blue-Green". #{...} are Octopus variables.
+# Blue-green: the new version comes up behind the preview service and is analysed
+# before promotion; after traffic switches it's analysed again. A red pod in either
+# window aborts the rollout and the active service stays on / returns to the old version.
+# The active/preview Services are created by the "Prepare namespace" step, not here.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: colour-health
+spec:
+  args:
+    - name: service
+  metrics:
+    - name: colour-health
+      # Pods report healthy=false while their colour is the fail colour.
+      interval: 5s
+      initialDelay: 5s
+      count: "#{AnalysisCount}"  # quoted: Octopus parses the YAML before substituting
+      failureLimit: 0
+      successCondition: result.healthy == true
+      provider:
+        web:
+          url: "http://{{args.service}}/api/health"
+          jsonPath: "{$}"
+          timeoutSeconds: 3
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: "#{RolloutName}"
+  labels:
+    app.kubernetes.io/part-of: colour-demo
+  annotations:
+    # Where this Rollout lives in Octopus. On abort, the Argo Rollouts webhook
+    # (k8s/argo-notifications.yaml) runs this project's Record Argo rollback runbook, which
+    # records rollback-release (the release Argo falls back to) in this environment.
+    octopus.com/space-id: "#{Octopus.Space.Id}"
+    octopus.com/project: "#{Octopus.Project.Name}"
+    octopus.com/environment: "#{Octopus.Environment.Name}"
+    octopus.com/release: "#{Octopus.Release.Number}"
+    octopus.com/rollback-release: "#{Octopus.Action[Check deployed version].Output.StableRelease}"
+    octopus.com/deployment: "#{Octopus.Deployment.Id}"
+    octopus.com/deployed-at: "#{Octopus.Action[Check deployed version].Output.DeployedAt}"
+    notifications.argoproj.io/subscribe.on-aborted-sync-octopus.octopus: ""
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      colour-demo/rollout: "#{RolloutName}"
+  template:
+    metadata:
+      annotations:
+        # Each ReplicaSet records its Octopus release, so the cluster can say which
+        # release is actually running.
+        octopus.com/release: "#{Octopus.Release.Number}"
+      labels:
+        app.kubernetes.io/part-of: colour-demo
+        colour-demo/rollout: "#{RolloutName}"
+    spec:
+      containers:
+        - name: colour-app
+          image: "#{Image}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: MODE
+              value: app
+            - name: APP_VERSION
+              value: "#{Octopus.Release.Number}"
+            - name: START_COLOUR
+              value: "#{StartColour}"
+            - name: FAIL_COLOUR
+              value: "#{FailColour}"
+            - name: ROLLOUT_NAME
+              value: "#{RolloutName}"
+            - name: STRATEGY
+              value: blueGreen
+            - name: CONTAINER_NAME
+              value: colour-app
+            - name: IMAGE
+              value: "#{Image}"
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+            - name: POD_IP
+              valueFrom: {fieldRef: {fieldPath: status.podIP}}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+  strategy:
+    blueGreen:
+      activeService: "#{RolloutName}-active"
+      previewService: "#{RolloutName}-preview"
+      autoPromotionEnabled: true
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+          - templateName: colour-health
+        args:
+          - name: service
+            value: "#{RolloutName}-preview.#{Namespace}.svc.cluster.local"
+      postPromotionAnalysis:
+        templates:
+          - templateName: colour-health
+        args:
+          - name: service
+            value: "#{RolloutName}-active.#{Namespace}.svc.cluster.local"
