@@ -121,6 +121,35 @@ The record-only deployment shows "Recorded without deploying" in its log, and it
 rollbacks. [docs/how-it-works.md](docs/how-it-works.md) covers the deployment process, why
 the webhook goes through a runbook, rapid deployments, and what was learned building it.
 
+### Why a runbook records the rollback
+
+Two Octopus behaviours shape the design:
+
+- **One deployment at a time.** Octopus runs one deployment per project and environment at a
+  time, and queues the rest. That's built in: there's no setting to change it.
+- **Cancel superseded deployments.** The demo needs this project setting, which the installer
+  turns on (`CancelQueuedTasks` and `CancelRunningTasks`). Queuing a deployment then cancels
+  any older one still waiting, so however fast deployments arrive, at most one runs and one
+  waits, and the newest release always runs next. On an Octopus version without the setting,
+  the installer prints a note and deployments queue up instead.
+
+So Argo's webhook doesn't create the record deployment itself: that deployment would join the
+queue. An earlier version did that. In testing, the record waited minutes behind a running
+deployment, then ran after the cluster had moved on, failed as stale, and Octopus showed that
+failed release as current.
+
+Runbook runs don't wait in the deployment queue, so the **Record Argo rollback** runbook
+decides with current information, a few seconds after Argo aborts:
+
+- if a newer deployment is queued or running, it skips: that deployment shows what's running
+  when it finishes;
+- otherwise, it creates the record-only deployment. If a newer deployment arrives before the
+  record starts, it supersedes the record, so a record never runs stale.
+
+See [Rapid deployments](docs/how-it-works.md#rapid-deployments) for the detail, and
+[the stress test results](docs/how-it-works.md#stress-test-results) for how it behaves with a
+deployment every 5 seconds.
+
 ## What you need
 
 **Your machine** (see [Preparing your machine](#preparing-your-machine))

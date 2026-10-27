@@ -16,6 +16,9 @@ they were created with.
   repo root there, and `k` then ran against your current kubectl context; `k` now refuses to
   run if the settings aren't loaded.
 - `.gitignore` covers vim undo files (`*.un~`).
+- README: "Why a runbook records the rollback": Octopus runs one deployment at a time per
+  project and environment, the demo needs "cancel superseded deployments", and that's why
+  Argo's webhook starts a runbook instead of queuing a deployment.
 - The dashboard shows **Rollout complete (pods unmonitored)** once a rollout has finished:
   Argo's analysis only runs during a rollout, so recolouring a stable pod does nothing. The
   image is now `colour-demo:1.2.0`; run `./install.sh dashboard octopus` and create a new
