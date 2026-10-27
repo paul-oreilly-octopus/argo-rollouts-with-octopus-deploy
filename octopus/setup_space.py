@@ -1,25 +1,39 @@
 #!/usr/bin/env python3
-"""Creates the Octopus space and its environments if they don't exist (re-runnable).
+"""Finds the Octopus space and adds any missing environments (re-runnable).
 
-The space is OCTOPUS_SPACE_NAME, with the API key's user as its space manager. Creating a
-space needs the SpaceCreate permission; to use an existing space instead, create it in
-Octopus first (or set OCTOPUS_SPACE_NAME to it) and this only adds missing environments.
+The space is OCTOPUS_SPACE_NAME, normally created by an administrator with the API key's
+account as a space manager. If no space has that name and the key can create spaces
+(SpaceCreate), this creates it, with the key's account as its space manager.
 """
 import sys
 
 from config import SETTINGS
-from octopus_api import ApiError, api, find_space
+from octopus_api import ApiError, api
 
 LIFECYCLE = "Default Lifecycle"
 
 
+def not_found(name, me, visible):
+    """Exits explaining that the key's account can't see a space called name."""
+    seen = ", ".join(f'"{s["Name"]}"' for s in visible) if visible else "none"
+    sys.exit(f'No space named "{name}" is visible to {me["Username"]}, and it can\'t create spaces '
+             f"(SpaceCreate). Spaces it can see: {seen}.\n"
+             f'If the space exists, set OCTOPUS_SPACE_NAME in config.env to its exact name. Otherwise ask an '
+             f'Octopus administrator to create it with {me["Username"]} as a space manager (see "The Octopus '
+             'API key" in README.md). Then run ./install.sh again.')
+
+
 def main():
-    space = find_space()
+    name = SETTINGS["OCTOPUS_SPACE_NAME"]
+    visible = api("GET", "spaces/all")
+    space = next((s for s in visible if s["Name"] == name), None)
     if space is None:
         me = api("GET", "users/me")
+        if "SpaceCreate" not in api("GET", f"users/{me['Id']}/permissions").get("SystemPermissions", []):
+            not_found(name, me, visible)
         try:
             space = api("POST", "spaces", {
-                "Name": SETTINGS["OCTOPUS_SPACE_NAME"],
+                "Name": name,
                 "Description": "Argo Rollouts with Octopus Deploy demo "
                                "(github.com/paul-oreilly-octopus/argo-rollouts-with-octopus-deploy).",
                 "SpaceManagersTeams": [],
@@ -28,10 +42,7 @@ def main():
         except ApiError as e:
             if e.status not in (401, 403):
                 raise
-            sys.exit(f'Space "{SETTINGS["OCTOPUS_SPACE_NAME"]}" doesn\'t exist, and {me["Username"]} isn\'t '
-                     "allowed to create spaces (SpaceCreate). Ask an Octopus administrator to create it with "
-                     f"{me['Username']} as a space manager (or set OCTOPUS_SPACE_NAME to a space they manage), "
-                     "then run ./install.sh again.")
+            not_found(name, me, visible)
         print(f"Created space {space['Name']} ({space['Id']})")
     else:
         print(f"Using space {space['Name']} ({space['Id']})")

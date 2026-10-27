@@ -34,7 +34,8 @@ you can explain exactly what to do.
 - [ ] **Octopus URL**, e.g. `https://their-instance.octopus.app`. For a self-hosted server,
   also the polling address (default `https://<host>:10943/`) and gRPC address (default
   `grpc://<host>:8443`).
-- [ ] **Space name:** default `Argo Rollouts Demo`.
+- [ ] **Space name:** the exact name of the space the administrator creates (default
+  `Argo Rollouts Demo`). It must match exactly.
 - [ ] **(user) An API key limited to that space.** Octopus keys can't be scoped to a space
   themselves: they have the permissions of their account. So recommend that an Octopus
   administrator:
@@ -71,9 +72,9 @@ Follow [Preparing your machine](README.md#preparing-your-machine) for their OS.
 
 ## 4. Configure
 
-- [ ] `cp config.example.env config.env`, then set `OCTOPUS_URL`, `OCTOPUS_SPACE_NAME`, and
-  anything else that differs from the defaults (key file path, ports, self-hosted URLs, worker
-  pool).
+- [ ] `cp config.example.env config.env`, then ask the user to fill it in, or fill it in from
+  their answers: `OCTOPUS_URL`, `OCTOPUS_SPACE_NAME`, and anything else that differs from the
+  defaults (key file path, ports, self-hosted URLs, worker pool).
 - [ ] `python3 octopus/config.py check` passes. It never prints the key.
 - [ ] `git status` shows no new tracked changes: `config.env` and `secrets/` are ignored.
 
@@ -90,6 +91,8 @@ Follow [Preparing your machine](README.md#preparing-your-machine) for their OS.
   - [ ] `k get pods -n "$AGENT_NAMESPACE"` (agent, and the Kubernetes monitor)
   - [ ] `k get pods -n colour-demo-dashboard`
 - [ ] The dashboard returns 200: `curl -s -o /dev/null -w '%{http_code}\n' "$(scripts/dashboard-url.sh)"`.
+  Give the user its link, e.g. http://localhost (`http://localhost:<INGRESS_HTTP_PORT>` for
+  other ports).
 - [ ] In Octopus, the space has:
   - [ ] a healthy deployment target named `AGENT_NAME`;
   - [ ] the projects "Colour Demo - Canary" and "Colour Demo - Blue-Green";
@@ -97,8 +100,10 @@ Follow [Preparing your machine](README.md#preparing-your-machine) for their OS.
 
 ## 7. Test deployments and a rollback
 
-- [ ] `python3 octopus/deploy.py canary` succeeds (about 3 minutes).
-- [ ] `python3 octopus/deploy.py bluegreen` succeeds (about 2 minutes).
+- [ ] `python3 octopus/deploy.py canary` succeeds (about 30 seconds: a project's first
+  deployment has nothing to roll out from; later ones take about 3 minutes).
+- [ ] `python3 octopus/deploy.py bluegreen` succeeds (about 30 seconds the first time; about 2
+  minutes later).
 - [ ] `python3 octopus/deploy.py canary --colour red` fails with "Argo Rollouts aborted release ...".
 - [ ] Within about 30 seconds, the canary project's **Record Argo rollback** runbook ran and
   logged "Recording ...".

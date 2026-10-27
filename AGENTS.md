@@ -32,13 +32,17 @@ from forking the repo: work through it, and use this file for the detail.
 
 ### 1. Gather what you need
 
-Ask the user for anything you can't find:
+These settings go in `config.env`, which has a line for each. The simplest route is to copy
+`config.example.env` to `config.env` (step 3) and ask the user to fill it in. Ask the user for
+anything you can't find:
 - **Octopus URL**, e.g. `https://their-instance.octopus.app`. For a self-hosted server, also
   the polling address (default `https://<host>:10943/`) and gRPC address (default
   `grpc://<host>:8443`).
 - **Where their API key is:** a file path. The default is `secrets/octopus-api-key.txt` in the
   repo. Don't ask them to paste it.
-- **Space name:** the default "Argo Rollouts Demo" is created if it doesn't exist.
+- **Space name:** the exact name of the space created for the demo (default
+  "Argo Rollouts Demo"). Normally an administrator creates it first, with the key's account as
+  a space manager. The installer only creates it if the key has `SpaceCreate`.
 - **Which account the key belongs to.** API keys can't be scoped to a space: they have their
   account's permissions. Recommend a **service account** that an administrator makes a
   **space manager** of a space they create for the demo, so the key can only touch that space.
@@ -49,6 +53,8 @@ Ask the user for anything you can't find:
   Rollouts' webhook and the runbooks), and that this is a demo shortcut: in production, each of
   those should have its own tightly scoped key.
 - Any port conflicts: the defaults are 80 and 443 (`INGRESS_HTTP_PORT`, `INGRESS_HTTPS_PORT`).
+  The installer checks they're free before creating the cluster. The dashboard is at
+  `http://localhost:<INGRESS_HTTP_PORT>` (just `http://localhost` for port 80).
 
 ### 2. Check the machine
 
@@ -105,6 +111,9 @@ k get pods -n colour-demo-dashboard           # dashboard Running
 curl -s -o /dev/null -w '%{http_code}\n' "$(scripts/dashboard-url.sh)"   # 200
 ```
 
+Give the user the dashboard's link: `scripts/dashboard-url.sh` prints it, e.g.
+http://localhost.
+
 In Octopus (UI or API), the space should have:
 - a deployment target named `AGENT_NAME` that's healthy;
 - the projects "Colour Demo - Canary" and "Colour Demo - Blue-Green";
@@ -113,10 +122,15 @@ In Octopus (UI or API), the space should have:
 ### 6. First deployments and a rollback test
 
 ```bash
-python3 octopus/deploy.py canary                # Success (about 3 minutes with the default 45s pauses)
-python3 octopus/deploy.py bluegreen             # Success (about 2 minutes)
+python3 octopus/deploy.py canary                # Success
+python3 octopus/deploy.py bluegreen             # Success
 python3 octopus/deploy.py canary --colour red   # Fails: "Argo Rollouts aborted release ..."
 ```
+
+A project's first deployment takes about 30 seconds: there's no earlier release to roll out
+from, so Argo starts the pods straight away. After that, a canary deployment takes about 3
+minutes (with the default 45s pauses) and a blue-green one about 2 minutes. The red one fails
+within about 30 seconds.
 
 After the red deployment fails, within about 30 seconds:
 - the project's **Record Argo rollback** runbook should have run and logged "Recording ...";
@@ -145,10 +159,12 @@ superseded deployments" setting at work.
 
 | Symptom | Likely cause and fix |
 |---|---|
-| `SpaceCreate` / 403 creating the space | The key's account can't create spaces: have an admin create it with that account as a space manager, or set `OCTOPUS_SPACE_NAME` to a space it manages |
+| `No space named ... is visible to ...` | The message lists the spaces the key can see. Usually `OCTOPUS_SPACE_NAME` doesn't exactly match the space the user created: fix it in `config.env`. If the space isn't listed, an admin must create it (or add the key's account as a space manager) |
 | 401 from Octopus after the key was replaced, e.g. the webhook or a runbook | The old key is still in the cluster or the project variables: run `./install.sh agent octopus argo` |
 | Pods fail with "too many open files" (Linux) | Raise the inotify limits (README, Linux section) |
-| `port is already allocated` creating the cluster | Change `INGRESS_HTTP_PORT` / `INGRESS_HTTPS_PORT`; `./uninstall.sh` (ask first), then `./install.sh` |
+| `port ... is already in use` | Set `INGRESS_HTTP_PORT` / `INGRESS_HTTPS_PORT` in `config.env` to free ports, then `./install.sh` |
+| `port is already allocated`, or `the cluster's dashboard port is ...` | The cluster exists with other ports. Set the ports back, or `./uninstall.sh` (ask first), then `./install.sh` |
+| `FileNotFoundError: 'kubectl'` or `kind: command not found` | The tools aren't in `BIN_DIR` (default `~/.local/bin`): run `./install.sh tools` |
 | The agent's Helm install times out | `k -n "$AGENT_NAMESPACE" logs <agent pod>`. Usually `OCTOPUS_POLLING_URL` is wrong (self-hosted), or the key lacks permission to register targets |
 | A deployment target already exists with that name | The installer deletes a target named `AGENT_NAME` when the agent isn't installed (it's left over from an earlier cluster). If it belongs to something else, set a different `AGENT_NAME` |
 | Runbook runs stay queued or fail to start | No usable worker: set `OCTOPUS_WORKER_POOL` to a pool with PowerShell that can reach `OCTOPUS_URL` |

@@ -14,7 +14,7 @@ describe() {
     check) echo "Check settings" ;;
     tools) echo "Install missing tools (kind, kubectl, helm, kubectl-argo-rollouts)" ;;
     cluster) echo "Create the kind cluster with ingress-nginx and Argo Rollouts" ;;
-    space) echo "Create the Octopus space and environments" ;;
+    space) echo "Find the Octopus space (or create it) and add its environments" ;;
     agent) echo "Install the Octopus Kubernetes agent" ;;
     dashboard) echo "Build the colour-demo image and deploy the dashboard" ;;
     octopus) echo "Create the Octopus projects and runbooks" ;;
